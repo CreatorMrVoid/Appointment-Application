@@ -12,13 +12,19 @@ import {
   Alert,
 } from 'react-native';
 
-export default function LoginScreen() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [userType, setUserType] = useState('patient'); // 'patient' or 'doctor'
+import { router } from 'expo-router';
 
-  const handleLogin = async () => {
+type UserType = 'patient' | 'doctor';
+
+export default function LoginScreen() {
+  const [email, setEmail] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [userType, setUserType] = useState<UserType>('patient');
+
+  // Using Expo Router for navigation, other mothod caused error
+
+  const handleLogin = async (): Promise<void> => {
     if (!email || !password) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
@@ -26,11 +32,16 @@ export default function LoginScreen() {
 
     setIsLoading(true);
     
-    // TODO: Replace with actual API call
-    setTimeout(() => {
+    try {
+      // TODO: Replace with actual API call
+      setTimeout(() => {
+        setIsLoading(false);
+        Alert.alert('Success', `Login successful as ${userType}!`);
+      }, 1500);
+    } catch (error) {
       setIsLoading(false);
-      Alert.alert('Success', `Login successful as ${userType}!`);
-    }, 1500);
+      Alert.alert('Error', 'Login failed. Please try again.');
+    }
   };
 
   return (
@@ -50,12 +61,12 @@ export default function LoginScreen() {
             <Text style={styles.hospitalName}>MedData Hospital</Text>
             <Text style={styles.subtitle}>Appointment Management System</Text>
           </View>
-
+  
           {/* Login Form */}
           <View style={styles.formContainer}>
             <Text style={styles.welcomeText}>Welcome Back</Text>
             <Text style={styles.loginText}>Sign in to your account</Text>
-
+  
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Email Address</Text>
               <TextInput
@@ -63,13 +74,13 @@ export default function LoginScreen() {
                 placeholder="Enter your email"
                 placeholderTextColor="#A0A0A0"
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(text: string) => setEmail(text)}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
               />
             </View>
-
+  
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Password</Text>
               <TextInput
@@ -77,72 +88,60 @@ export default function LoginScreen() {
                 placeholder="Enter your password"
                 placeholderTextColor="#A0A0A0"
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(text: string) => setPassword(text)}
                 secureTextEntry
                 autoCapitalize="none"
               />
             </View>
-
+  
+            {/* Forgot Password */}
             <TouchableOpacity style={styles.forgotPassword}>
               <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
             </TouchableOpacity>
-
+  
+            {/* User Type Selection */}
+            <View style={styles.userTypeContainer}>
+              <Text style={styles.userTypeTitle}>Login as:</Text>
+              <View style={styles.userTypeButtons}>
+                <TouchableOpacity 
+                  style={[styles.userTypeButton, styles.patientButton, userType === 'patient' && styles.selectedUserType]}
+                  onPress={() => setUserType('patient')}
+                >
+                  <Text style={[styles.userTypeButtonText, userType === 'patient' && styles.selectedUserTypeText]}>
+                    Patient
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.userTypeButton, styles.doctorButton, userType === 'doctor' && styles.selectedUserType]}
+                  onPress={() => setUserType('doctor')}
+                >
+                  <Text style={[styles.userTypeButtonText, styles.doctorButtonText, userType === 'doctor' && styles.selectedUserTypeText]}>
+                    Doctor
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+  
+            {/* Login Button */}
             <TouchableOpacity 
               style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
               onPress={handleLogin}
               disabled={isLoading}
             >
               <Text style={styles.loginButtonText}>
-                {isLoading ? 'Signing In...' : 'Sign In'}
+                {isLoading ? 'Logging In...' : 'Login'}
               </Text>
             </TouchableOpacity>
-
-            {/* User Type Selection */}
-            <View style={styles.userTypeContainer}>
-              <Text style={styles.userTypeTitle}>Login as:</Text>
-              <View style={styles.userTypeButtons}>
-                <TouchableOpacity 
-                  style={[
-                    styles.userTypeButton, 
-                    styles.patientButton,
-                    userType === 'patient' && styles.selectedUserType
-                  ]}
-                  onPress={() => setUserType('patient')}
-                >
-                  <Text style={[
-                    styles.userTypeButtonText,
-                    userType === 'patient' && styles.selectedUserTypeText
-                  ]}>
-                    Patient
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[
-                    styles.userTypeButton, 
-                    styles.doctorButton,
-                    userType === 'doctor' && styles.selectedUserType
-                  ]}
-                  onPress={() => setUserType('doctor')}
-                >
-                  <Text style={[
-                    styles.userTypeButtonText, 
-                    styles.doctorButtonText,
-                    userType === 'doctor' && styles.selectedUserTypeText
-                  ]}>
-                    Doctor
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
+  
+            {/* Signup Link */}
             <View style={styles.signupContainer}>
               <Text style={styles.signupText}>Don't have an account? </Text>
-              <TouchableOpacity>
+              <TouchableOpacity onPress={() => router.push('/RegisterScreen')}>
                 <Text style={styles.signupLink}>Register Here</Text>
               </TouchableOpacity>
             </View>
           </View>
-
+  
           {/* Footer */}
           <View style={styles.footer}>
             <Text style={styles.footerText}>© 2025 MedData Hospital</Text>
@@ -152,6 +151,7 @@ export default function LoginScreen() {
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
+  
 }
 
 const styles = StyleSheet.create({
