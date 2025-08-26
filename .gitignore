@@ -1,0 +1,77 @@
+########################
+# General
+########################
+.DS_Store
+Thumbs.db
+
+########################
+# Node / Monorepo
+########################
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+########################
+# Environment
+########################
+.env
+.env.*
+!.env.example
+backend/.env
+frontend/.env
+
+########################
+# Build output / Caches / Coverage
+########################
+dist/
+build/
+coverage/
+.cache/
+.metro-cache/
+.parcel-cache/
+tmp/
+temp/
+.tmp/
+
+# per-package build folders
+backend/dist/
+frontend/dist/
+
+########################
+# Logs
+########################
+logs
+*.log
+logs/*.log
+lerna-debug.log*
+
+########################
+# Expo / React Native
+########################
+.expo/
+.expo-shared/
+web-build/
+android/
+ios/
+**/build/
+.gradle/
+Pods/
+DerivedData/
+*.xcworkspace
+*.xcuserdatad/
+*.xcuserstate
+
+########################
+# IDE / Editor
+########################
+.vscode/
+.idea/
+*.iml
+
+########################
+# Misc
+########################
+.turbo/
+.DS_Store?
