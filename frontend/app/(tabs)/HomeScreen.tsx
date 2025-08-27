@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { SafeAreaView, View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { api } from '../../constants/api';
+import { palette, spacing, radii, shadow, typography } from '../../constants/theme';
+import { useRouter } from 'expo-router';
 
 type UserProfile = {
   id: number | string;
@@ -19,6 +21,7 @@ type Appointment = {
 };
 
 export default function HomeScreen() {
+  const router = useRouter();
   const [me, setMe] = useState<UserProfile | null>(null);
   const [appts, setAppts] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -69,7 +72,7 @@ export default function HomeScreen() {
           ) : (
             <Text style={styles.muted}>No upcoming appointments.</Text>
           )}
-          <TouchableOpacity style={styles.primaryBtn}><Text style={styles.primaryBtnText}>New Appointment</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push('/(tabs)/NewAppointmentScreen')}><Text style={styles.primaryBtnText}>New Appointment</Text></TouchableOpacity>
         </View>
 
         <View style={styles.row}>
@@ -100,33 +103,33 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
-  content: { padding: 16 },
-  header: { alignItems: 'center', marginBottom: 16 },
-  logo: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#2E86C1', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
-  logoText: { color: '#fff', fontSize: 24, fontWeight: 'bold' },
-  title: { fontSize: 22, fontWeight: 'bold', color: '#2C3E50' },
-  subtitle: { fontSize: 12, color: '#7F8C8D' },
-  card: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 16, shadowColor: '#000', shadowOpacity: 0.05, shadowOffset: { width: 0, height: 4 }, shadowRadius: 8, elevation: 2 },
-  cardTitle: { fontSize: 14, color: '#7F8C8D' },
-  cardUser: { fontSize: 20, fontWeight: '700', color: '#2C3E50', marginBottom: 8 },
-  skeleton: { height: 64, backgroundColor: '#EEF2F4', borderRadius: 12, marginVertical: 8 },
-  nextApptBox: { padding: 12, borderRadius: 12, backgroundColor: '#F4F8FB', borderWidth: 1, borderColor: '#E6EEF6', marginBottom: 8 },
-  nextApptTitle: { fontWeight: '600', color: '#2C3E50' },
-  nextApptSub: { color: '#7F8C8D', fontSize: 12 },
-  muted: { color: '#7F8C8D' },
-  primaryBtn: { marginTop: 12, backgroundColor: '#2E86C1', paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
-  primaryBtnText: { color: '#fff', fontWeight: '700' },
-  row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
-  stat: { flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 12, marginHorizontal: 4, alignItems: 'center' },
-  statLabel: { color: '#7F8C8D', fontSize: 12 },
-  statValue: { color: '#2C3E50', fontWeight: '700', fontSize: 18 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#2C3E50', marginBottom: 8 },
+  container: { flex: 1, backgroundColor: palette.background },
+  content: { padding: spacing.lg },
+  header: { alignItems: 'center', marginBottom: spacing.lg },
+  logo: { width: 56, height: 56, borderRadius: 28, backgroundColor: palette.primary, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm },
+  logoText: { color: palette.white, fontSize: 24, fontWeight: 'bold' },
+  title: { fontSize: typography.title, fontWeight: 'bold', color: palette.text },
+  subtitle: { fontSize: typography.subtitle, color: palette.mutedText },
+  card: { backgroundColor: palette.card, borderRadius: radii.lg, padding: spacing.lg, marginBottom: spacing.lg, ...shadow.card },
+  cardTitle: { fontSize: typography.body, color: palette.mutedText },
+  cardUser: { fontSize: 20, fontWeight: '700', color: palette.text, marginBottom: spacing.sm },
+  skeleton: { height: 64, backgroundColor: palette.neutral, borderRadius: radii.md, marginVertical: spacing.sm },
+  nextApptBox: { padding: spacing.md, borderRadius: radii.md, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.surfaceBorder, marginBottom: spacing.sm },
+  nextApptTitle: { fontWeight: '600', color: palette.text },
+  nextApptSub: { color: palette.mutedText, fontSize: typography.subtitle },
+  muted: { color: palette.mutedText },
+  primaryBtn: { marginTop: spacing.md, backgroundColor: palette.primary, paddingVertical: spacing.md, borderRadius: radii.md, alignItems: 'center' },
+  primaryBtnText: { color: palette.white, fontWeight: '700' },
+  row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.lg },
+  stat: { flex: 1, backgroundColor: palette.card, borderRadius: radii.lg, padding: spacing.md, marginHorizontal: 4, alignItems: 'center' },
+  statLabel: { color: palette.mutedText, fontSize: typography.subtitle },
+  statValue: { color: palette.text, fontWeight: '700', fontSize: 18 },
+  sectionTitle: { fontSize: typography.heading, fontWeight: '700', color: palette.text, marginBottom: spacing.sm },
   apptRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
-  apptDot: { width: 10, height: 10, backgroundColor: '#2E86C1', borderRadius: 5, marginRight: 10 },
-  apptTitle: { color: '#2C3E50', fontWeight: '600' },
-  apptSub: { color: '#7F8C8D', fontSize: 12 },
-  badge: { backgroundColor: '#EEF2F4', color: '#2C3E50', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, textTransform: 'capitalize' },
+  apptDot: { width: 10, height: 10, backgroundColor: palette.primary, borderRadius: 5, marginRight: 10 },
+  apptTitle: { color: palette.text, fontWeight: '600' },
+  apptSub: { color: palette.mutedText, fontSize: typography.subtitle },
+  badge: { backgroundColor: palette.neutral, color: palette.text, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, textTransform: 'capitalize' },
 });
 
 
