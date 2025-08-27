@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 
 import { router } from 'expo-router';
+import { registerUser } from '../../constants/api';
 
 type UserType = 'patient' | 'doctor';
 
@@ -25,7 +26,7 @@ export default function RegisterScreen() {
   const [userType, setUserType] = useState<UserType>('patient');
 
   const handleRegister = async (): Promise<void> => {
-    if (!email || !password || !confirmPassword) {
+    if (!email || !name || !password || !confirmPassword) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
@@ -38,14 +39,19 @@ export default function RegisterScreen() {
     setIsLoading(true);
 
     try {
-      // TODO: Replace with actual API call
-      setTimeout(() => {
-        setIsLoading(false);
-        Alert.alert('Success', `Registration successful as ${userType}!`);
-      }, 1500);
-    } catch (error) {
+      await registerUser({ name, email, password, usertype: userType });
       setIsLoading(false);
-      Alert.alert('Error', 'Registration failed. Please try again.');
+      Alert.alert('Success', `Registration successful as ${userType}!`);
+      router.push('/LoginScreen');
+    } catch (error: any) {
+      setIsLoading(false);
+      const data = error?.response?.data;
+      const baseMessage = data?.error || error?.message || 'Registration failed. Please try again.';
+      const details = Array.isArray(data?.details)
+        ? data.details.map((d: any) => `${d?.path?.join('.') || 'field'}: ${d?.message}`).join('\n')
+        : '';
+      const message = details ? `${baseMessage}\n\n${details}` : baseMessage;
+      Alert.alert('Error', message);
     }
   };
 

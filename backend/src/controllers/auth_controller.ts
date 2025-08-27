@@ -38,8 +38,7 @@ export async function refresh(req: Request, res: Response) {
   }
 }
 
-export async function me(_req: Request, res: Response) {
-  // If you attach user from requireAuth:
-  // return res.json({ user: (req as any).user });
-  return res.status(501).json({ error: "Not implemented" });
+export async function me(req: Request, res: Response) {
+  const user = (req as any).user;
+  return res.json({ user });
 }

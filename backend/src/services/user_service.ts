@@ -1,7 +1,5 @@
-import { PrismaClient } from "../generated/prisma";
+import prisma from "../utils/prisma";
 import { hashPassword, comparePassword } from "../utils/password";
-
-const prisma = new PrismaClient();
 
 export async function registerUser(input: {
   name: string;
