@@ -6,6 +6,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import env from "./utils/env";
 import authRouter from "./routes/auth_routes";
+import appointmentRouter from "./routes/appointment_routes";
 import rateLimit from "express-rate-limit";
 import { errorHandler } from "./middlewares/error";
 
@@ -22,6 +23,7 @@ const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
 app.use("/api/auth", authLimiter);
 
 app.use("/api/auth", authRouter);
+app.use("/api/appointments", appointmentRouter);
 
 // central error handler (must be last)
 app.use(errorHandler);

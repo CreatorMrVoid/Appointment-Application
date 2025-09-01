@@ -8,7 +8,10 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev --name init_app_models",
+    "db:push": "prisma db push",
     "prisma:studio": "prisma studio",
+    "db:seed": "ts-node-dev --transpile-only src/seed.ts",
     "postinstall": "prisma generate"
   },
   "keywords": [],

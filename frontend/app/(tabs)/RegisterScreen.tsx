@@ -22,6 +22,8 @@ export default function RegisterScreen() {
   const [name, setName] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState<string>('');
+  const [phone, setPhone] = useState<string>('');
+  const [ssn, setSsn] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [userType, setUserType] = useState<UserType>('patient');
 
@@ -39,7 +41,14 @@ export default function RegisterScreen() {
     setIsLoading(true);
 
     try {
-      await registerUser({ name, email, password, usertype: userType });
+      await registerUser({ 
+        name, 
+        email, 
+        password, 
+        phone: phone || undefined,
+        ssn: ssn || undefined,
+        usertype: userType 
+      });
       setIsLoading(false);
       Alert.alert('Success', `Registration successful as ${userType}!`);
       router.push('/LoginScreen');
@@ -102,6 +111,35 @@ export default function RegisterScreen() {
                 onChangeText={(text: string) => setName(text)}
                 autoCapitalize="words" //words: Make capital first letter of each word.
                 autoCorrect={false}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Phone Number</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your phone number"
+                placeholderTextColor="#A0A0A0"
+                value={phone}
+                onChangeText={(text: string) => setPhone(text)}
+                keyboardType="phone-pad"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>SSN (Social Security Number)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your SSN (XXX-XX-XXXX)"
+                placeholderTextColor="#A0A0A0"
+                value={ssn}
+                onChangeText={(text: string) => setSsn(text)}
+                keyboardType="numeric"
+                autoCapitalize="none"
+                autoCorrect={false}
+                maxLength={11}
               />
             </View>
 

@@ -1,36 +1,10 @@
-import React, { useMemo, useState } from 'react';
-import { SafeAreaView, View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useMemo, useState, useEffect } from 'react';
+import { SafeAreaView, View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { palette, spacing, radii, shadow, typography } from '../../constants/theme';
 import { useRouter } from 'expo-router';
+import { getDepartments, getDoctorsByDepartment, createAppointment, Department, Doctor } from '../../constants/api';
 
-type Department = {
-  id: string;
-  name: string;
-};
-
-type Doctor = {
-  id: string;
-  name: string;
-  departmentId: string;
-};
-
-// Temporary mock data. Replace with API calls when backend endpoints are ready.
-const DEPARTMENTS: Department[] = [
-  { id: 'cardiology', name: 'Cardiology' },
-  { id: 'dermatology', name: 'Dermatology' },
-  { id: 'neurology', name: 'Neurology' },
-  { id: 'orthopedics', name: 'Orthopedics' },
-  { id: 'pediatrics', name: 'Pediatrics' },
-];
-
-const DOCTORS: Doctor[] = [
-  { id: 'd1', name: 'Dr. Alice Carter', departmentId: 'cardiology' },
-  { id: 'd2', name: 'Dr. Ben Hughes', departmentId: 'cardiology' },
-  { id: 'd3', name: 'Dr. Priya Patel', departmentId: 'dermatology' },
-  { id: 'd4', name: 'Dr. Omar Ali', departmentId: 'neurology' },
-  { id: 'd5', name: 'Dr. Jane Smith', departmentId: 'orthopedics' },
-  { id: 'd6', name: 'Dr. Mark Johnson', departmentId: 'pediatrics' },
-];
+// Available time slots
 
 const HOURS: string[] = [
   '09:00', '09:30', '10:00', '10:30', '11:00',
@@ -39,13 +13,102 @@ const HOURS: string[] = [
 
 export default function NewAppointmentScreen() {
   const router = useRouter();
-  const [selectedDepartment, setSelectedDepartment] = useState<string | null>(null);
-  const [selectedDoctor, setSelectedDoctor] = useState<string | null>(null);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [selectedDepartment, setSelectedDepartment] = useState<number | null>(null);
+  const [selectedDoctor, setSelectedDoctor] = useState<number | null>(null);
   const [selectedHour, setSelectedHour] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [departmentsLoading, setDepartmentsLoading] = useState(true);
+  const [doctorsLoading, setDoctorsLoading] = useState(false);
 
-  const doctorsForDepartment = useMemo(() => DOCTORS.filter(d => d.departmentId === selectedDepartment), [selectedDepartment]);
+  // Load departments on component mount
+  useEffect(() => {
+    const loadDepartments = async () => {
+      try {
+        setDepartmentsLoading(true);
+        const response = await getDepartments();
+        setDepartments(response.departments);
+      } catch (error) {
+        console.error('Error loading departments:', error);
+        Alert.alert('Error', 'Failed to load departments. Please try again.');
+      } finally {
+        setDepartmentsLoading(false);
+      }
+    };
+
+    loadDepartments();
+  }, []);
+
+  // Load doctors when department is selected
+  useEffect(() => {
+    if (selectedDepartment) {
+      const loadDoctors = async () => {
+        try {
+          setDoctorsLoading(true);
+          const response = await getDoctorsByDepartment(selectedDepartment);
+          setDoctors(response.doctors);
+        } catch (error) {
+          console.error('Error loading doctors:', error);
+          Alert.alert('Error', 'Failed to load doctors. Please try again.');
+        } finally {
+          setDoctorsLoading(false);
+        }
+      };
+
+      loadDoctors();
+    } else {
+      setDoctors([]);
+    }
+  }, [selectedDepartment]);
 
   const canContinue = !!(selectedDepartment && selectedDoctor && selectedHour);
+
+  const handleConfirmAppointment = async () => {
+    if (!selectedDepartment || !selectedDoctor || !selectedHour) {
+      Alert.alert('Error', 'Please select a department, doctor, and time slot.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // Create appointment date from selected hour
+      const today = new Date();
+      const [hours, minutes] = selectedHour.split(':').map(Number);
+      const appointmentDate = new Date(today);
+      appointmentDate.setHours(hours, minutes, 0, 0);
+      
+      // If the selected time is in the past, set it for tomorrow
+      if (appointmentDate < today) {
+        appointmentDate.setDate(appointmentDate.getDate() + 1);
+      }
+
+      const response = await createAppointment({
+        doctorId: selectedDoctor,
+        departmentId: selectedDepartment,
+        startsAt: appointmentDate.toISOString(),
+        reason: 'General consultation',
+      });
+
+      Alert.alert(
+        'Success!',
+        'Your appointment has been booked successfully.',
+        [
+          {
+            text: 'OK',
+            onPress: () => router.back(),
+          },
+        ]
+      );
+    } catch (error: any) {
+      console.error('Error creating appointment:', error);
+      const errorMessage = error.response?.data?.error || 'Failed to book appointment. Please try again.';
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -57,29 +120,41 @@ export default function NewAppointmentScreen() {
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Departments</Text>
-          <View style={styles.chipRow}>
-            {DEPARTMENTS.map(dep => (
-              <TouchableOpacity
-                key={dep.id}
-                style={[styles.chip, selectedDepartment === dep.id && styles.chipSelected]}
-                onPress={() => {
-                  setSelectedDepartment(dep.id);
-                  setSelectedDoctor(null);
-                  setSelectedHour(null);
-                }}
-              >
-                <Text style={[styles.chipText, selectedDepartment === dep.id && styles.chipTextSelected]}>{dep.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          {departmentsLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color={palette.primary} />
+              <Text style={styles.loadingText}>Loading departments...</Text>
+            </View>
+          ) : (
+            <View style={styles.chipRow}>
+              {departments.map(dep => (
+                <TouchableOpacity
+                  key={dep.id}
+                  style={[styles.chip, selectedDepartment === dep.id && styles.chipSelected]}
+                  onPress={() => {
+                    setSelectedDepartment(dep.id);
+                    setSelectedDoctor(null);
+                    setSelectedHour(null);
+                  }}
+                >
+                  <Text style={[styles.chipText, selectedDepartment === dep.id && styles.chipTextSelected]}>{dep.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
 
         {!!selectedDepartment && (
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Available Doctors</Text>
-            {doctorsForDepartment.length ? (
+            {doctorsLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color={palette.primary} />
+                <Text style={styles.loadingText}>Loading doctors...</Text>
+              </View>
+            ) : doctors.length ? (
               <View style={styles.list}>
-                {doctorsForDepartment.map(doc => (
+                {doctors.map(doc => (
                   <TouchableOpacity
                     key={doc.id}
                     style={[styles.listItem, selectedDoctor === doc.id && styles.listItemSelected]}
@@ -89,7 +164,7 @@ export default function NewAppointmentScreen() {
                     }}
                   >
                     <View style={[styles.dot, selectedDoctor === doc.id && styles.dotActive]} />
-                    <Text style={styles.listItemText}>{doc.name}</Text>
+                    <Text style={styles.listItemText}>{doc.title ? `${doc.title} ${doc.name}` : doc.name}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -121,8 +196,16 @@ export default function NewAppointmentScreen() {
           <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.back()}>
             <Text style={styles.secondaryBtnText}>Cancel</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.primaryBtn, !canContinue && styles.primaryBtnDisabled]} disabled={!canContinue} onPress={() => router.back()}>
-            <Text style={styles.primaryBtnText}>Confirm</Text>
+          <TouchableOpacity 
+            style={[styles.primaryBtn, (!canContinue || loading) && styles.primaryBtnDisabled]} 
+            disabled={!canContinue || loading} 
+            onPress={handleConfirmAppointment}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color={palette.white} />
+            ) : (
+              <Text style={styles.primaryBtnText}>Confirm</Text>
+            )}
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -161,6 +244,8 @@ const styles = StyleSheet.create({
   primaryBtnText: { color: palette.white, fontWeight: '700' },
   secondaryBtn: { backgroundColor: palette.neutral, paddingVertical: spacing.md, borderRadius: radii.md, alignItems: 'center', flex: 1, marginRight: spacing.sm },
   secondaryBtnText: { color: palette.text, fontWeight: '700' },
+  loadingContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.md },
+  loadingText: { marginLeft: spacing.sm, color: palette.mutedText, fontSize: typography.body },
 });
 
 

@@ -5,6 +5,8 @@ export async function registerUser(input: {
   name: string;
   email: string;
   password: string;
+  phone?: string;
+  ssn?: string;
   usertype?: string;
 }) {
   const existing = await prisma.users.findUnique({ where: { email: input.email } });
@@ -12,14 +14,19 @@ export async function registerUser(input: {
 
   const hashed = await hashPassword(input.password);
 
+no   // Clean SSN - remove hyphens and ensure it's a string
+  const cleanSsn = input.ssn ? input.ssn.replace(/-/g, '').substring(0, 11) : undefined;
+
   const user = await prisma.users.create({
     data: {
       name: input.name,
       email: input.email,
       password: hashed,
+      phone: input.phone,
+      ssn: cleanSsn,
       usertype: input.usertype ?? "user",
     },
-    select: { id: true, name: true, email: true, usertype: true, created_at: true }
+    select: { id: true, name: true, email: true, phone: true, ssn: true, usertype: true, created_at: true }
   });
 
   return user;
@@ -32,7 +39,7 @@ export async function validateUser(email: string, password: string) {
   const ok = await comparePassword(password, user.password);
   if (!ok) return null;
 
-  // don’t return password
+  // don't return password
   const { password: _, ...safe } = user;
   return safe;
 }
