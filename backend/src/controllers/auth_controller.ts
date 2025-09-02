@@ -4,9 +4,12 @@ import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../utils/
 
 export async function register(req: Request, res: Response) {
   try {
+    console.log("[auth_controller.register] START", { bodyKeys: Object.keys(req.body || {}) });
     const user = await registerUser(req.body);
+    console.log("[auth_controller.register] SUCCESS", { userId: user.id, email: user.email });
     return res.status(201).json({ user });
   } catch (e: any) {
+    console.error("[auth_controller.register] ERROR", e?.message, e?.stack);
     if (e.message === "EMAIL_TAKEN") {
       return res.status(409).json({ error: "Email already in use" });
     }
