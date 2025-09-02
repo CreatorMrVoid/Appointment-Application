@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 
 import { router } from 'expo-router';
+import { loginUser, setAccessToken } from '../../constants/api';
 
 type UserType = 'patient' | 'doctor';
 
@@ -33,14 +34,20 @@ export default function LoginScreen() {
     setIsLoading(true);
     
     try {
-      // TODO: Replace with actual API call
-      setTimeout(() => {
-        setIsLoading(false);
-        Alert.alert('Success', `Login successful as ${userType}!`);
-      }, 1500);
+      const { tokens, user } = await loginUser({ email, password });
+      setAccessToken(tokens?.accessToken);
+      setIsLoading(false);
+      Alert.alert('Success', `Welcome ${user?.name || ''}!`);
+      router.replace('/HomeScreen');
     } catch (error) {
       setIsLoading(false);
-      Alert.alert('Error', 'Login failed. Please try again.');
+      const data: any = (error as any)?.response?.data;
+      const baseMessage = data?.error || (error as any)?.message || 'Login failed. Please try again.';
+      const details = Array.isArray(data?.details)
+        ? data.details.map((d: any) => `${d?.path?.join('.') || 'field'}: ${d?.message}`).join('\n')
+        : '';
+      const message = details ? `${baseMessage}\n\n${details}` : baseMessage;
+      Alert.alert('Error', message);
     }
   };
 

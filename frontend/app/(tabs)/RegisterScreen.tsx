@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 
 import { router } from 'expo-router';
+import { registerUser } from '../../constants/api';
 
 type UserType = 'patient' | 'doctor';
 
@@ -21,11 +22,13 @@ export default function RegisterScreen() {
   const [name, setName] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState<string>('');
+  const [phone, setPhone] = useState<string>('');
+  const [ssn, setSsn] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [userType, setUserType] = useState<UserType>('patient');
 
   const handleRegister = async (): Promise<void> => {
-    if (!email || !password || !confirmPassword) {
+    if (!email || !name || !password || !confirmPassword) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
@@ -38,14 +41,26 @@ export default function RegisterScreen() {
     setIsLoading(true);
 
     try {
-      // TODO: Replace with actual API call
-      setTimeout(() => {
-        setIsLoading(false);
-        Alert.alert('Success', `Registration successful as ${userType}!`);
-      }, 1500);
-    } catch (error) {
+      await registerUser({ 
+        name, 
+        email, 
+        password, 
+        phone: phone || undefined,
+        ssn: ssn || undefined,
+        usertype: userType 
+      });
       setIsLoading(false);
-      Alert.alert('Error', 'Registration failed. Please try again.');
+      Alert.alert('Success', `Registration successful as ${userType}!`);
+      router.push('/LoginScreen');
+    } catch (error: any) {
+      setIsLoading(false);
+      const data = error?.response?.data;
+      const baseMessage = data?.error || error?.message || 'Registration failed. Please try again.';
+      const details = Array.isArray(data?.details)
+        ? data.details.map((d: any) => `${d?.path?.join('.') || 'field'}: ${d?.message}`).join('\n')
+        : '';
+      const message = details ? `${baseMessage}\n\n${details}` : baseMessage;
+      Alert.alert('Error', message);
     }
   };
 
@@ -96,6 +111,35 @@ export default function RegisterScreen() {
                 onChangeText={(text: string) => setName(text)}
                 autoCapitalize="words" //words: Make capital first letter of each word.
                 autoCorrect={false}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Phone Number</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your phone number"
+                placeholderTextColor="#A0A0A0"
+                value={phone}
+                onChangeText={(text: string) => setPhone(text)}
+                keyboardType="phone-pad"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>SSN (Social Security Number)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your SSN (XXX-XX-XXXX)"
+                placeholderTextColor="#A0A0A0"
+                value={ssn}
+                onChangeText={(text: string) => setSsn(text)}
+                keyboardType="numeric"
+                autoCapitalize="none"
+                autoCorrect={false}
+                maxLength={11}
               />
             </View>
 
