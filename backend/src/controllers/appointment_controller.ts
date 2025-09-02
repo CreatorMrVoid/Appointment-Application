@@ -23,8 +23,8 @@ const createAppointmentSchema = z.object({
 export async function createAppointment(req: AuthenticatedRequest, res: Response) {
   try {
     const { doctorId, departmentId, startsAt, reason } = createAppointmentSchema.parse(req.body);
-    const patientId = req.user?.id;
-
+    const patientId = (req.user as any)?.sub;
+    
     if (!patientId) {
       return res.status(401).json({ error: 'User not authenticated' });
     }
@@ -141,7 +141,7 @@ export async function getAppointments(req: AuthenticatedRequest, res: Response) 
     });
 
     res.json({
-      appointments: appointments.map(appointment => ({
+      appointments: appointments.map((appointment: typeof appointments[number]) => ({
         id: appointment.id,
         doctor: {
           id: appointment.doctor.id,
@@ -208,7 +208,7 @@ export async function getDoctorsByDepartment(req: Request, res: Response) {
     });
 
     res.json({
-      doctors: doctors.map(doctor => ({
+      doctors: doctors.map((doctor: typeof doctors[number]) => ({
         id: doctor.id,
         name: doctor.user.name,
         title: doctor.title,
