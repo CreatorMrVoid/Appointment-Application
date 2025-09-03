@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { registerUser, validateUser } from "../services/user_service";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../utils/jwt";
+import { prisma } from "../utils/prisma";
 
 export async function register(req: Request, res: Response) {
   try {
@@ -42,6 +43,12 @@ export async function refresh(req: Request, res: Response) {
 }
 
 export async function me(req: Request, res: Response) {
-  const user = (req as any).user;
-  return res.json({ user });
+  const tokenUser = (req as any).user as { sub?: number; email?: string; usertype?: string } | undefined;
+  if (!tokenUser?.sub) return res.status(401).json({ error: "Unauthenticated" });
+  const dbUser = await prisma.users.findFirst({
+    where: { id: tokenUser.sub },
+    select: { id: true, name: true, email: true, usertype: true },
+  });
+  if (!dbUser) return res.status(404).json({ error: "User not found" });
+  return res.json({ user: dbUser });
 }

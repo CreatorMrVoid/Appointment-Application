@@ -106,7 +106,7 @@ export default function LoginScreen() {
               <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
             </TouchableOpacity>
   
-            {/* User Type Selection */}
+            {/* User Type Selection 
             <View style={styles.userTypeContainer}>
               <Text style={styles.userTypeTitle}>Login as:</Text>
               <View style={styles.userTypeButtons}>
@@ -128,7 +128,9 @@ export default function LoginScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-  
+            */}
+
+            
             {/* Login Button */}
             <TouchableOpacity 
               style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}

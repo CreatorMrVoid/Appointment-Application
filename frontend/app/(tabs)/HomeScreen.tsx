@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { SafeAreaView, View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { api } from '../../constants/api';
+import { getAppointments } from '../../constants/api';
 import { palette, spacing, radii, shadow, typography } from '../../constants/theme';
 import { useRouter } from 'expo-router';
 
@@ -9,6 +10,7 @@ type UserProfile = {
   name?: string;
   fullName?: string;
   email?: string;
+  usertype?: 'patient' | 'doctor' | string;
 };
 
 type Appointment = {
@@ -44,6 +46,38 @@ export default function HomeScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await getAppointments();
+        if (!mounted) return;
+        const mapped: Appointment[] = (res.appointments || []).map((a: any) => ({
+          id: String(a.id),
+          date: a.startsAt,
+          department: a?.department?.name ?? 'Department',
+          doctor: a?.doctor?.name ?? 'Doctor',
+          location: a?.department?.name ?? 'Hospital',
+          status: ((): Appointment['status'] => {
+            const s = String(a.status || '').toLowerCase();
+            if (s === 'pending') return 'pending';
+            if (s === 'confirmed') return 'upcoming';
+            if (s === 'rescheduled') return 'upcoming';
+            if (s === 'completed') return 'completed';
+            if (s === 'cancelled' || s === 'canceled') return 'cancelled';
+            return 'pending';
+          })(),
+        }));
+        setAppts(mapped);
+      } catch (e) {
+        // ignore for homescreen
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const nextAppointment = useMemo(() => {
     return appts.length
       ? [...appts].sort((a, b) => +new Date(a.date) - +new Date(b.date))[0]
@@ -56,12 +90,14 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <View style={styles.logo}><Text style={styles.logoText}>+</Text></View>
           <Text style={styles.title}>MedData Hospital</Text>
-          <Text style={styles.subtitle}>Appointment Management</Text>
+          <Text style={styles.subtitle}>Appointment Management {me?.usertype === 'doctor' ? '• Doctor' : ''}</Text>
         </View>
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Welcome back</Text>
-          <Text style={styles.cardUser}>{me?.name || me?.fullName || 'Patient'}</Text>
+          <Text style={styles.cardUser}>
+            {(me?.name || me?.fullName || 'User')}{me?.usertype === 'doctor' ? ' (Doctor)' : ''}
+          </Text>
           {loading ? (
             <View style={styles.skeleton} />
           ) : nextAppointment ? (
@@ -72,15 +108,28 @@ export default function HomeScreen() {
           ) : (
             <Text style={styles.muted}>No upcoming appointments.</Text>
           )}
-          <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push('/(tabs)/NewAppointmentScreen')}><Text style={styles.primaryBtnText}>New Appointment</Text></TouchableOpacity>
+          {me?.usertype === 'doctor' ? (
+            <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push('/(tabs)/DoctorScheduleScreen')}><Text style={styles.primaryBtnText}>View My Schedule</Text></TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push('/(tabs)/NewAppointmentScreen')}><Text style={styles.primaryBtnText}>New Appointment</Text></TouchableOpacity>
+          )}
         </View>
 
-        <View style={styles.row}>
-          <View style={styles.stat}><Text style={styles.statLabel}>Upcoming</Text><Text style={styles.statValue}>{appts.filter(a => a.status === 'upcoming').length}</Text></View>
-          <View style={styles.stat}><Text style={styles.statLabel}>Pending</Text><Text style={styles.statValue}>{appts.filter(a => a.status === 'pending').length}</Text></View>
-          <View style={styles.stat}><Text style={styles.statLabel}>Completed</Text><Text style={styles.statValue}>{appts.filter(a => a.status === 'completed').length}</Text></View>
-          <View style={styles.stat}><Text style={styles.statLabel}>Messages</Text><Text style={styles.statValue}>5</Text></View>
-        </View>
+        {me?.usertype === 'doctor' ? (
+          <View style={styles.row}>
+            <View style={styles.stat}><Text style={styles.statLabel}>Today</Text><Text style={styles.statValue}>{appts.filter(a => new Date(a.date).toDateString() === new Date().toDateString()).length}</Text></View>
+            <View style={styles.stat}><Text style={styles.statLabel}>Upcoming</Text><Text style={styles.statValue}>{appts.filter(a => new Date(a.date) > new Date()).length}</Text></View>
+            <View style={styles.stat}><Text style={styles.statLabel}>Completed</Text><Text style={styles.statValue}>{appts.filter(a => a.status === 'completed').length}</Text></View>
+            <View style={styles.stat}><Text style={styles.statLabel}>Notes</Text><Text style={styles.statValue}>—</Text></View>
+          </View>
+        ) : (
+          <View style={styles.row}>
+            <View style={styles.stat}><Text style={styles.statLabel}>Upcoming</Text><Text style={styles.statValue}>{appts.filter(a => a.status === 'upcoming').length}</Text></View>
+            <View style={styles.stat}><Text style={styles.statLabel}>Pending</Text><Text style={styles.statValue}>{appts.filter(a => a.status === 'pending').length}</Text></View>
+            <View style={styles.stat}><Text style={styles.statLabel}>Completed</Text><Text style={styles.statValue}>{appts.filter(a => a.status === 'completed').length}</Text></View>
+            <View style={styles.stat}><Text style={styles.statLabel}>Messages</Text><Text style={styles.statValue}>5</Text></View>
+          </View>
+        )}
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Your Appointments</Text>

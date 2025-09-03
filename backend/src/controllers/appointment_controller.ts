@@ -36,9 +36,11 @@ export async function createAppointment(req: AuthenticatedRequest, res: Response
         isActive: true,
         departmentId: departmentId,
       },
-      include: {
-        user: true,
-        department: true,
+      select: {
+        id: true,
+        userId: true,
+        title: true,
+        departmentId: true,
       },
     });
 
@@ -72,32 +74,47 @@ export async function createAppointment(req: AuthenticatedRequest, res: Response
         status: 'PENDING',
         reason: reason || 'General consultation',
         source: 'MOBILE',
+        createdAt: new Date(),
+        updatedAt: new Date(),
       },
-      include: {
-        doctor: {
-          include: {
-            user: true,
-            department: true,
-          },
-        },
-        department: true,
-        patient: true,
+      select: {
+        id: true,
+        doctorId: true,
+        departmentId: true,
+        startsAt: true,
+        endsAt: true,
+        status: true,
+        reason: true,
       },
     });
+
+    // Resolve doctor and department display fields
+    const createdDoctor = await prisma.doctors.findFirst({
+      where: { id: appointment.doctorId },
+      select: { userId: true, title: true },
+    });
+    const doctorUser = createdDoctor
+      ? await prisma.users.findFirst({ where: { id: createdDoctor.userId }, select: { name: true } })
+      : null;
+    const dep = appointment.departmentId
+      ? await prisma.departments.findFirst({ where: { id: appointment.departmentId }, select: { id: true, name: true } })
+      : null;
 
     res.status(201).json({
       message: 'Appointment created successfully',
       appointment: {
         id: appointment.id,
         doctor: {
-          id: appointment.doctor.id,
-          name: appointment.doctor.user.name,
-          title: appointment.doctor.title,
+          id: appointment.doctorId,
+          name: doctorUser?.name || 'Unknown',
+          title: createdDoctor?.title || null,
         },
-        department: {
-          id: appointment.department?.id,
-          name: appointment.department?.name,
-        },
+        department: dep
+          ? {
+              id: dep.id,
+              name: dep.name,
+            }
+          : { id: null, name: null },
         startsAt: appointment.startsAt,
         endsAt: appointment.endsAt,
         status: appointment.status,
@@ -116,7 +133,7 @@ export async function createAppointment(req: AuthenticatedRequest, res: Response
 
 export async function getAppointments(req: AuthenticatedRequest, res: Response) {
   try {
-    const patientId = req.user?.id;
+    const patientId = (req.user as any)?.sub;
 
     if (!patientId) {
       return res.status(401).json({ error: 'User not authenticated' });
@@ -126,37 +143,58 @@ export async function getAppointments(req: AuthenticatedRequest, res: Response) 
       where: {
         patientId: patientId,
       },
-      include: {
-        doctor: {
-          include: {
-            user: true,
-            department: true,
-          },
-        },
-        department: true,
+      select: {
+        id: true,
+        doctorId: true,
+        departmentId: true,
+        startsAt: true,
+        endsAt: true,
+        status: true,
+        reason: true,
       },
       orderBy: {
         startsAt: 'asc',
       },
     });
 
+    const doctorIds = Array.from(new Set(appointments.map((a) => a.doctorId)));
+    const doctors = doctorIds.length
+      ? await prisma.doctors.findMany({
+          where: { id: { in: doctorIds } },
+          select: { id: true, userId: true, title: true },
+        })
+      : [];
+    const doctorIdToDoctor = new Map(doctors.map((d) => [d.id, d] as const));
+    const userIds = Array.from(new Set(doctors.map((d) => d.userId)));
+    const users = userIds.length
+      ? await prisma.users.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true } })
+      : [];
+    const userIdToName = new Map(users.map((u) => [u.id, u.name] as const));
+    const departmentIds = Array.from(new Set(appointments.map((a) => a.departmentId).filter(Boolean))) as number[];
+    const departments = departmentIds.length
+      ? await prisma.departments.findMany({ where: { id: { in: departmentIds } }, select: { id: true, name: true } })
+      : [];
+    const depIdToDep = new Map(departments.map((d) => [d.id, d] as const));
+
     res.json({
-      appointments: appointments.map((appointment: typeof appointments[number]) => ({
-        id: appointment.id,
-        doctor: {
-          id: appointment.doctor.id,
-          name: appointment.doctor.user.name,
-          title: appointment.doctor.title,
-        },
-        department: {
-          id: appointment.department?.id,
-          name: appointment.department?.name,
-        },
-        startsAt: appointment.startsAt,
-        endsAt: appointment.endsAt,
-        status: appointment.status,
-        reason: appointment.reason,
-      })),
+      appointments: appointments.map((appointment) => {
+        const doc = doctorIdToDoctor.get(appointment.doctorId);
+        const doctorName = doc ? userIdToName.get(doc.userId) || 'Unknown' : 'Unknown';
+        const dep = appointment.departmentId ? depIdToDep.get(appointment.departmentId) : undefined;
+        return {
+          id: appointment.id,
+          doctor: {
+            id: appointment.doctorId,
+            name: doctorName,
+            title: doc?.title || null,
+          },
+          department: dep ? { id: dep.id, name: dep.name } : { id: null, name: null },
+          startsAt: appointment.startsAt,
+          endsAt: appointment.endsAt,
+          status: appointment.status,
+          reason: appointment.reason,
+        };
+      }),
     });
   } catch (error) {
     console.error('Error fetching appointments:', error);
@@ -191,32 +229,102 @@ export async function getDoctorsByDepartment(req: Request, res: Response) {
       return res.status(400).json({ error: 'Invalid department ID' });
     }
 
+    // Fetch doctors for department
     const doctors = await prisma.doctors.findMany({
       where: {
         departmentId: departmentIdNum,
         isActive: true,
       },
-      include: {
-        user: true,
-        department: true,
-      },
-      orderBy: {
-        user: {
-          name: 'asc',
-        },
+      select: {
+        id: true,
+        userId: true,
+        title: true,
+        departmentId: true,
       },
     });
 
-    res.json({
-      doctors: doctors.map((doctor: typeof doctors[number]) => ({
-        id: doctor.id,
-        name: doctor.user.name,
-        title: doctor.title,
-        departmentId: doctor.departmentId,
-      })),
-    });
+    // Fetch corresponding users to resolve doctor names
+    const userIds = doctors.map((d) => d.userId);
+    const users = userIds.length
+      ? await prisma.users.findMany({
+          where: { id: { in: userIds } },
+          select: { id: true, name: true },
+        })
+      : [];
+    const userIdToName = new Map(users.map((u) => [u.id, u.name] as const));
+
+    // Sort by user name asc to preserve previous behavior
+    const doctorsWithNames = doctors
+      .map((d) => ({
+        id: d.id,
+        name: userIdToName.get(d.userId) || 'Unknown',
+        title: d.title || null,
+        departmentId: d.departmentId || null,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    res.json({ doctors: doctorsWithNames });
   } catch (error) {
     console.error('Error fetching doctors:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+// Get schedule for the logged-in doctor
+export async function getDoctorSchedule(req: Request, res: Response) {
+  try {
+    const user = (req as any).user as { sub?: number } | undefined;
+    if (!user?.sub) return res.status(401).json({ error: 'User not authenticated' });
+
+    // Find doctor profile by userId
+    const doctor = await prisma.doctors.findFirst({
+      where: { userId: user.sub, isActive: true },
+      select: { id: true },
+    });
+    if (!doctor) return res.status(404).json({ error: 'Doctor profile not found' });
+
+    // Fetch appointments for this doctor
+    const appointments = await prisma.appointments.findMany({
+      where: { doctorId: doctor.id },
+      select: {
+        id: true,
+        patientId: true,
+        departmentId: true,
+        startsAt: true,
+        endsAt: true,
+        status: true,
+        reason: true,
+      },
+      orderBy: { startsAt: 'asc' },
+    });
+
+    // Resolve patient names
+    const patientIds = Array.from(new Set(appointments.map(a => a.patientId)));
+    const patients = patientIds.length
+      ? await prisma.users.findMany({ where: { id: { in: patientIds } }, select: { id: true, name: true } })
+      : [];
+    const patientIdToName = new Map(patients.map(p => [p.id, p.name] as const));
+
+    // Resolve departments
+    const depIds = Array.from(new Set(appointments.map(a => a.departmentId).filter(Boolean))) as number[];
+    const departments = depIds.length
+      ? await prisma.departments.findMany({ where: { id: { in: depIds } }, select: { id: true, name: true } })
+      : [];
+    const depIdToDep = new Map(departments.map(d => [d.id, d] as const));
+
+    return res.json({
+      schedule: appointments.map(a => ({
+        id: a.id,
+        patient: { id: a.patientId, name: patientIdToName.get(a.patientId) || 'Unknown' },
+        department: a.departmentId ? depIdToDep.get(a.departmentId) || { id: a.departmentId, name: 'Department' } : { id: null, name: null },
+        startsAt: a.startsAt,
+        endsAt: a.endsAt,
+        status: a.status,
+        reason: a.reason,
+      })),
+    });
+  } catch (error) {
+    console.error('Error fetching doctor schedule:', error);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }

@@ -107,3 +107,18 @@ export async function getDoctorsByDepartment(departmentId: number) {
   const res = await api.get(`/api/appointments/doctors/${departmentId}`);
   return res.data as { doctors: Doctor[] };
 }
+
+export type DoctorScheduleItem = {
+  id: number;
+  patient: { id: number; name: string };
+  department: { id: number | null; name: string | null };
+  startsAt: string;
+  endsAt: string;
+  status: string;
+  reason?: string | null;
+};
+
+export async function getDoctorSchedule() {
+  const res = await api.get('/api/appointments/schedule');
+  return res.data as { schedule: DoctorScheduleItem[] };
+}

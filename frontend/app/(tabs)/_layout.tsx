@@ -7,6 +7,7 @@ export default function TabsLayout() {
       <Stack.Screen name="RegisterScreen" options={{ headerShown: false }} />
       <Stack.Screen name="HomeScreen" options={{ headerShown: false }} />
       <Stack.Screen name="NewAppointmentScreen" options={{ title: 'New Appointment' }} />
+      <Stack.Screen name="DoctorScheduleScreen" options={{ title: 'My Schedule' }} />
     </Stack>
   );
 }

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../middlewares/auth';
-import { createAppointment, getAppointments, getDepartments, getDoctorsByDepartment } from '../controllers/appointment_controller';
+import { createAppointment, getAppointments, getDepartments, getDoctorsByDepartment, getDoctorSchedule } from '../controllers/appointment_controller';
 
 const router = Router();
 
@@ -18,5 +18,8 @@ router.get('/departments', getDepartments);
 
 // Get doctors by department
 router.get('/doctors/:departmentId', getDoctorsByDepartment);
+
+// Get logged-in doctor's schedule
+router.get('/schedule', getDoctorSchedule);
 
 export default router;
