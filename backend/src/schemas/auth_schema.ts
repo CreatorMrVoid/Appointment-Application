@@ -22,7 +22,20 @@ export const registerSchema = z.object({
       const digits = val.replace(/\D/g, "");
       return digits.slice(0, 11) || undefined;
     }),
-  usertype: z.string().optional() // default handled in service
+  usertype: z.enum(["patient", "doctor"]).optional(),
+  // Doctor-specific fields (accepted when usertype is 'doctor')
+  departmentId: z.number().int().positive().optional(),
+  title: z.string().max(50).optional(),
+  bio: z.string().max(2000).optional(),
+  room: z.string().max(20).optional(),
+  room_phone: z
+    .string()
+    .optional()
+    .transform((val) => {
+      if (!val) return undefined;
+      const digits = val.replace(/\D/g, "");
+      return digits.slice(0, 20) || undefined;
+    }),
 });
 
 export const loginSchema = z.object({

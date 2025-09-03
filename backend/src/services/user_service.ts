@@ -10,6 +10,12 @@ export async function registerUser(input: {
   phone?: string;
   ssn?: string;
   usertype?: string;
+  // Doctor-specific optional inputs
+  departmentId?: number;
+  title?: string;
+  bio?: string;
+  room?: string;
+  room_phone?: string;
 }) {
   console.log("[user_service.registerUser] input", { email: input.email, usertype: input.usertype });
   const existing = await prisma.users.findUnique({ where: { email: input.email } });
@@ -31,12 +37,34 @@ export async function registerUser(input: {
       email: input.email,
       password: hashed,
       phone: cleanPhone,
-      ssn: cleanSsn,
-      usertype: input.usertype ?? "user",
+      ssn: input.usertype === 'doctor' ? undefined : cleanSsn,
+      usertype: input.usertype === 'doctor' ? 'doctor' : 'patient',
     },
     select: { id: true, name: true, email: true, phone: true, ssn: true, usertype: true, created_at: true }
   });
   console.log("[user_service.registerUser] created", { id: user.id });
+
+  // If doctor, create doctor profile
+  if ((input.usertype || '').toLowerCase() === 'doctor') {
+    const cleanRoomPhone = input.room_phone
+      ? input.room_phone.replace(/\D/g, '').slice(0, 20)
+      : undefined;
+  
+    await prisma.doctors.create({
+      data: {
+        userId: user.id,
+        departmentId: input.departmentId ?? null,
+        title: input.title || null,
+        bio: input.bio || null,
+        room: input.room || null,
+        room_phone: cleanRoomPhone || null,
+        isActive: true,
+        // Add these lines:
+        updatedAt: new Date(),
+        // createdAt: new Date(), // uncomment if your model requires it and has no default(now())
+      },
+    });
+  }
 
   return user;
 }

@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 
 import { router } from 'expo-router';
-import { registerUser } from '../../constants/api';
+import { registerUser, getDepartments, type Department } from '../../constants/api';
 
 type UserType = 'patient' | 'doctor';
 
@@ -26,6 +26,22 @@ export default function RegisterScreen() {
   const [ssn, setSsn] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [userType, setUserType] = useState<UserType>('patient');
+  // Doctor-specific state
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [departmentId, setDepartmentId] = useState<number | undefined>(undefined);
+  const [showDeptList, setShowDeptList] = useState<boolean>(false);
+  const [title, setTitle] = useState<string>('');
+  const [bio, setBio] = useState<string>('');
+  const [room, setRoom] = useState<string>('');
+  const [roomPhone, setRoomPhone] = useState<string>('');
+
+  React.useEffect(() => {
+    if (userType === 'doctor') {
+      getDepartments()
+        .then((res) => setDepartments(res.departments || []))
+        .catch(() => setDepartments([]));
+    }
+  }, [userType]);
 
   const handleRegister = async (): Promise<void> => {
     if (!email || !name || !password || !confirmPassword) {
@@ -41,14 +57,24 @@ export default function RegisterScreen() {
     setIsLoading(true);
 
     try {
-      await registerUser({ 
-        name, 
-        email, 
-        password, 
+      const payload: any = {
+        name,
+        email,
+        password,
         phone: phone || undefined,
-        ssn: ssn || undefined,
-        usertype: userType 
-      });
+        usertype: userType,
+      };
+      if (userType === 'patient') {
+        payload.ssn = ssn || undefined;
+      } else if (userType === 'doctor') {
+        payload.departmentId = departmentId;
+        payload.title = title || undefined;
+        payload.bio = bio || undefined;
+        payload.room = room || undefined;
+        payload.room_phone = roomPhone || undefined;
+      }
+
+      await registerUser(payload);
       setIsLoading(false);
       Alert.alert('Success', `Registration successful as ${userType}!`);
       router.push('/LoginScreen');
@@ -128,20 +154,22 @@ export default function RegisterScreen() {
               />
             </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>SSN (Social Security Number)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your SSN (XXX-XX-XXXX)"
-                placeholderTextColor="#A0A0A0"
-                value={ssn}
-                onChangeText={(text: string) => setSsn(text)}
-                keyboardType="numeric"
-                autoCapitalize="none"
-                autoCorrect={false}
-                maxLength={11}
-              />
-            </View>
+            {userType === 'patient' && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>SSN (Social Security Number)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your SSN (XXX-XX-XXXX)"
+                  placeholderTextColor="#A0A0A0"
+                  value={ssn}
+                  onChangeText={(text: string) => setSsn(text)}
+                  keyboardType="numeric"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  maxLength={11}
+                />
+              </View>
+            )}
 
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Password</Text>
@@ -206,6 +234,102 @@ export default function RegisterScreen() {
                 </TouchableOpacity>
               </View>
             </View>
+
+            {/* Doctor fields */}
+            {userType === 'doctor' && (
+              <View>
+                {/* Department selector */}
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>Department</Text>
+                  <TouchableOpacity
+                    style={styles.input}
+                    onPress={() => setShowDeptList((s) => !s)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={{ color: departmentId ? '#2C3E50' : '#A0A0A0', fontSize: 16 }}>
+                      {departmentId
+                        ? departments.find((d) => d.id === departmentId)?.name || 'Select department'
+                        : 'Select department'}
+                    </Text>
+                  </TouchableOpacity>
+                  {showDeptList && (
+                    <View style={styles.dropdown}>
+                      <ScrollView style={{ maxHeight: 200 }}>
+                        {departments.map((dep) => (
+                          <TouchableOpacity
+                            key={dep.id}
+                            style={styles.dropdownItem}
+                            onPress={() => {
+                              setDepartmentId(dep.id);
+                              setShowDeptList(false);
+                            }}
+                          >
+                            <Text style={styles.dropdownItemText}>{dep.name}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>Title</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Prof., Dr., Assoc. Prof., etc."
+                    placeholderTextColor="#A0A0A0"
+                    value={title}
+                    onChangeText={(text: string) => setTitle(text)}
+                    autoCapitalize="words"
+                    autoCorrect={false}
+                    maxLength={50}
+                  />
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>Bio / Profile link</Text>
+                  <TextInput
+                    style={[styles.input, { height: 80 }]}
+                    placeholder="Short bio or link to CV/personal page"
+                    placeholderTextColor="#A0A0A0"
+                    value={bio}
+                    onChangeText={(text: string) => setBio(text)}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    multiline
+                  />
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>Room No</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g., MB-102"
+                    placeholderTextColor="#A0A0A0"
+                    value={room}
+                    onChangeText={(text: string) => setRoom(text)}
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    maxLength={20}
+                  />
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>Room Phone</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g., 312-555-4482"
+                    placeholderTextColor="#A0A0A0"
+                    value={roomPhone}
+                    onChangeText={(text: string) => setRoomPhone(text)}
+                    keyboardType="phone-pad"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    maxLength={20}
+                  />
+                </View>
+              </View>
+            )}
 
             {/* Register Button */}
             <TouchableOpacity 
