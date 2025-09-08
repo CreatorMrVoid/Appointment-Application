@@ -1,6 +1,6 @@
 
 import "dotenv/config";
-import prisma, { computeEndsAt } from "./utils/prisma";
+import { prisma, computeEndsAt } from "./utils/prisma";
 
 async function main() {
   // Seed Departments first
@@ -28,6 +28,7 @@ async function main() {
         description: d.description,
         phone: d.phone,
         location: d.location,
+        updatedAt: new Date(),
       },
     });
     departments.push({ id: dep.id, name: dep.name, code: dep.code ?? null });
@@ -72,6 +73,7 @@ async function main() {
         departmentId: dep?.id,
         title: "Dr.",
         isActive: true,
+        updatedAt: new Date(),
       },
     });
   }
@@ -99,6 +101,7 @@ async function main() {
           status: "PENDING",
           reason: "Initial consultation",
           source: "SEED",
+          updatedAt: new Date(),
         },
       });
     } catch {
