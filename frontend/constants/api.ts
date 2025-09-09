@@ -128,3 +128,9 @@ export async function getDoctorSchedule() {
   const res = await api.get('/api/appointments/schedule');
   return res.data as { schedule: DoctorScheduleItem[] };
 }
+
+export async function updateAppointmentStatus(id: number, next: 'upcoming' | 'cancelled') {
+  const res = await api.patch(`/api/appointments/${id}/status`, { status: next });
+  return res.data as { ok: boolean; item: DoctorScheduleItem };
+}
+

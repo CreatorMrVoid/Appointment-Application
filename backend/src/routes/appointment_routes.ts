@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../middlewares/auth';
-import { createAppointment, getAppointments, getDepartments, getDoctorsByDepartment, getDoctorSchedule } from '../controllers/appointment_controller';
+import { createAppointment, getAppointments, getDepartments, getDoctorsByDepartment, getDoctorSchedule, updateAppointmentStatus } from '../controllers/appointment_controller';
 
 const router = Router();
 
@@ -19,5 +19,8 @@ router.get('/', getAppointments);
 
 // Get logged-in doctor's schedule
 router.get('/schedule', getDoctorSchedule);
+
+// Update appointment status (doctor-owned)
+router.patch('/:id/status', updateAppointmentStatus);
 
 export default router;
