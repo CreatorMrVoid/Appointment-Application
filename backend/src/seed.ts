@@ -55,26 +55,16 @@ async function main() {
     ];
   }
 
-  // Map users to departments and create doctor profiles
+  // Create doctor profiles ONLY for users marked as doctor
+  const doctorUsers = await prisma.users.findMany({ where: { usertype: 'doctor' }, orderBy: { id: 'asc' } });
   const departmentCycle = departments.length > 0 ? departments : [];
-  for (let i = 0; i < usersToUse.length; i += 1) {
-    const user = usersToUse[i];
+  for (let i = 0; i < doctorUsers.length; i += 1) {
+    const user = doctorUsers[i];
     const dep = departmentCycle[i % (departmentCycle.length || 1)];
-
     await prisma.doctors.upsert({
       where: { userId: user.id },
-      update: {
-        departmentId: dep?.id,
-        title: "Dr.",
-        isActive: true,
-      },
-      create: {
-        userId: user.id,
-        departmentId: dep?.id,
-        title: "Dr.",
-        isActive: true,
-        updatedAt: new Date(),
-      },
+      update: { departmentId: dep?.id, title: 'Dr.', isActive: true },
+      create: { userId: user.id, departmentId: dep?.id, title: 'Dr.', isActive: true, updatedAt: new Date() },
     });
   }
 

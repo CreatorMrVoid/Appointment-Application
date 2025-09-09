@@ -78,6 +78,16 @@ export default function HomeScreen() {
     };
   }, []);
 
+  const handleLogout = async () => {
+    try {
+      await api.post('/api/auth/logout'); // assuming your backend has this
+    } catch (e) {
+      // ignore
+    } finally {
+      router.replace('/LoginScreen'); // navigate to login page
+    }
+  };
+
   const nextAppointment = useMemo(() => {
     return appts.length
       ? [...appts].sort((a, b) => +new Date(a.date) - +new Date(b.date))[0]
@@ -87,10 +97,14 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
+        {/* Header with Logout Button */}
         <View style={styles.header}>
           <View style={styles.logo}><Text style={styles.logoText}>+</Text></View>
           <Text style={styles.title}>MedData Hospital</Text>
           <Text style={styles.subtitle}>Appointment Management {me?.usertype === 'doctor' ? '• Doctor' : ''}</Text>
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+            <Text style={styles.logoutText}>Logout</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.card}>
@@ -159,6 +173,19 @@ const styles = StyleSheet.create({
   logoText: { color: palette.white, fontSize: 24, fontWeight: 'bold' },
   title: { fontSize: typography.title, fontWeight: 'bold', color: palette.text },
   subtitle: { fontSize: typography.subtitle, color: palette.mutedText },
+  
+  logoutBtn: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    padding: spacing.sm,
+  },
+  logoutText: {
+    color: palette.primary,
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  
   card: { backgroundColor: palette.card, borderRadius: radii.lg, padding: spacing.lg, marginBottom: spacing.lg, ...shadow.card },
   cardTitle: { fontSize: typography.body, color: palette.mutedText },
   cardUser: { fontSize: 20, fontWeight: '700', color: palette.text, marginBottom: spacing.sm },
