@@ -1,6 +1,6 @@
 
 import "dotenv/config";
-import prisma, { computeEndsAt } from "./utils/prisma";
+import { prisma, computeEndsAt } from "./utils/prisma";
 
 async function main() {
   // Seed Departments first
@@ -28,6 +28,7 @@ async function main() {
         description: d.description,
         phone: d.phone,
         location: d.location,
+        updatedAt: new Date(),
       },
     });
     departments.push({ id: dep.id, name: dep.name, code: dep.code ?? null });
@@ -54,25 +55,16 @@ async function main() {
     ];
   }
 
-  // Map users to departments and create doctor profiles
+  // Create doctor profiles ONLY for users marked as doctor
+  const doctorUsers = await prisma.users.findMany({ where: { usertype: 'doctor' }, orderBy: { id: 'asc' } });
   const departmentCycle = departments.length > 0 ? departments : [];
-  for (let i = 0; i < usersToUse.length; i += 1) {
-    const user = usersToUse[i];
+  for (let i = 0; i < doctorUsers.length; i += 1) {
+    const user = doctorUsers[i];
     const dep = departmentCycle[i % (departmentCycle.length || 1)];
-
     await prisma.doctors.upsert({
       where: { userId: user.id },
-      update: {
-        departmentId: dep?.id,
-        title: "Dr.",
-        isActive: true,
-      },
-      create: {
-        userId: user.id,
-        departmentId: dep?.id,
-        title: "Dr.",
-        isActive: true,
-      },
+      update: { departmentId: dep?.id, title: 'Dr.', isActive: true },
+      create: { userId: user.id, departmentId: dep?.id, title: 'Dr.', isActive: true, updatedAt: new Date() },
     });
   }
 
@@ -99,6 +91,7 @@ async function main() {
           status: "PENDING",
           reason: "Initial consultation",
           source: "SEED",
+          updatedAt: new Date(),
         },
       });
     } catch {

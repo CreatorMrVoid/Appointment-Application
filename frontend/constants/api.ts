@@ -35,6 +35,12 @@ export type RegisterRequest = {
   phone?: string;
   ssn?: string;
   usertype?: 'patient' | 'doctor' | string;
+  // Doctor-specific optional fields
+  departmentId?: number;
+  title?: string;
+  bio?: string;
+  room?: string;
+  room_phone?: string;
 };
 
 export async function registerUser(req: RegisterRequest) {

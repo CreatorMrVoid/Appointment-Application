@@ -4,7 +4,11 @@ import { createAppointment, getAppointments, getDepartments, getDoctorsByDepartm
 
 const router = Router();
 
-// All appointment routes require authentication
+// Public endpoints for metadata
+router.get('/departments', getDepartments);
+router.get('/doctors/:departmentId', getDoctorsByDepartment);
+
+// Require auth for the rest
 router.use(requireAuth);
 
 // Create a new appointment
@@ -12,12 +16,6 @@ router.post('/', createAppointment);
 
 // Get user's appointments
 router.get('/', getAppointments);
-
-// Get all departments
-router.get('/departments', getDepartments);
-
-// Get doctors by department
-router.get('/doctors/:departmentId', getDoctorsByDepartment);
 
 // Get logged-in doctor's schedule
 router.get('/schedule', getDoctorSchedule);
