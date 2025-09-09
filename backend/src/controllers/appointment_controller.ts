@@ -328,3 +328,79 @@ export async function getDoctorSchedule(req: Request, res: Response) {
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
+
+// Update status for an appointment owned by the logged-in doctor
+export async function updateAppointmentStatus(req: Request, res: Response) {
+  try {
+    const user = (req as any).user as { sub?: number } | undefined;
+    if (!user?.sub) return res.status(401).json({ error: 'User not authenticated' });
+
+    const idParam = req.params.id;
+    const appointmentId = parseInt(idParam, 10);
+    if (isNaN(appointmentId)) return res.status(400).json({ error: 'Invalid appointment ID' });
+
+    const bodySchema = z.object({ status: z.enum(['upcoming', 'cancelled']) });
+    const { status } = bodySchema.parse(req.body);
+
+    // Map frontend status to DB enum values
+    const mappedStatus = status === 'upcoming' ? 'CONFIRMED' : 'CANCELLED';
+
+    // Ensure the requester is a doctor and owns the appointment
+    const doctor = await prisma.doctors.findFirst({
+      where: { userId: user.sub, isActive: true },
+      select: { id: true },
+    });
+    if (!doctor) return res.status(404).json({ error: 'Doctor profile not found' });
+
+    const existing = await prisma.appointments.findFirst({
+      where: { id: appointmentId, doctorId: doctor.id },
+      select: {
+        id: true,
+        patientId: true,
+        departmentId: true,
+      },
+    });
+    if (!existing) return res.status(404).json({ error: 'Appointment not found' });
+
+    const updated = await prisma.appointments.update({
+      where: { id: appointmentId },
+      data: { status: mappedStatus as any, updatedAt: new Date() },
+      select: {
+        id: true,
+        patientId: true,
+        departmentId: true,
+        startsAt: true,
+        endsAt: true,
+        status: true,
+        reason: true,
+      },
+    });
+
+    // Resolve patient name
+    const patient = await prisma.users.findFirst({ where: { id: updated.patientId }, select: { id: true, name: true } });
+
+    // Resolve department
+    const dep = updated.departmentId
+      ? await prisma.departments.findFirst({ where: { id: updated.departmentId }, select: { id: true, name: true } })
+      : null;
+
+    return res.json({
+      ok: true,
+      item: {
+        id: updated.id,
+        patient: { id: patient?.id || 0, name: patient?.name || 'Unknown' },
+        department: dep ? { id: dep.id, name: dep.name } : { id: null, name: null },
+        startsAt: updated.startsAt,
+        endsAt: updated.endsAt,
+        status: updated.status,
+        reason: updated.reason,
+      },
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Invalid input data', details: error.issues });
+    }
+    console.error('Error updating appointment status:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
