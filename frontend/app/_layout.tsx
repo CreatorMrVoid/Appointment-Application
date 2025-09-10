@@ -5,12 +5,20 @@ import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useEffect } from 'react';
+import { loadAccessToken } from '../constants/api';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
+
+  // Hydrate access token once on app start.
+  // Must be declared before any conditional returns to preserve hooks order.
+  useEffect(() => {
+    loadAccessToken();
+  }, []);
 
   if (!loaded) {
     // Async font loading only occurs in development.

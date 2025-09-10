@@ -1,4 +1,5 @@
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { API_BASE_URL } from './config';
 
 export const api = axios.create({
@@ -16,6 +17,32 @@ export function setAccessToken(token?: string) {
     delete api.defaults.headers.common['Authorization'];
   }
 }
+
+export async function saveAccessToken(token: string) {
+  try {
+    await AsyncStorage.setItem('access_token', token);
+  } catch {}
+  setAccessToken(token);
+}
+
+export async function loadAccessToken() {
+  try {
+    const token = await AsyncStorage.getItem('access_token');
+    if (token) setAccessToken(token);
+  } catch {}
+}
+
+// Attach token on each request in case defaults aren't hydrated yet
+api.interceptors.request.use(async (config) => {
+  try {
+    if (!config.headers) config.headers = {} as any;
+    if (!('Authorization' in config.headers) || !config.headers.Authorization) {
+      const token = await AsyncStorage.getItem('access_token');
+      if (token) (config.headers as any).Authorization = `Bearer ${token}`;
+    }
+  } catch {}
+  return config;
+});
 
 api.interceptors.response.use(
   (res) => res,
@@ -99,19 +126,20 @@ export async function createAppointment(req: CreateAppointmentRequest) {
   return res.data as { message: string; appointment: Appointment };
 }
 
-export async function getAppointments() {
-  const res = await api.get('/api/appointments');
-  return res.data as { appointments: Appointment[] };
+// Always return a normalized shape: { appointments: Appointment[] }
+export async function getAppointments(params?: { start?: string; end?: string }) {
+  const res = await api.get('/api/appointments', { params });
+  const data = res.data as { appointments?: Appointment[] } | Appointment[];
+  const appointments = Array.isArray(data) ? data : Array.isArray(data?.appointments) ? data.appointments! : [];
+  return { appointments } as { appointments: Appointment[] };
 }
 
-export async function getDepartments() {
-  const res = await api.get('/api/appointments/departments');
-  return res.data as { departments: Department[] };
-}
-
-export async function getDoctorsByDepartment(departmentId: number) {
-  const res = await api.get(`/api/appointments/doctors/${departmentId}`);
-  return res.data as { doctors: Doctor[] };
+// Calendar range helper – returns same normalized shape
+export async function getAppointmentDates(params: { start: string; end: string }) {
+  const res = await api.get('/api/appointments', { params });
+  const data = res.data as { appointments?: Appointment[] } | Appointment[];
+  const appointments = Array.isArray(data) ? data : Array.isArray(data?.appointments) ? data.appointments! : [];
+  return { appointments } as { appointments: Appointment[] };
 }
 
 export type DoctorScheduleItem = {
@@ -124,13 +152,25 @@ export type DoctorScheduleItem = {
   reason?: string | null;
 };
 
+export async function updateAppointmentStatus(id: number, next: 'upcoming' | 'cancelled') {
+  const res = await api.patch(`/api/appointments/${id}/status`, { status: next });
+  return res.data as { ok: boolean; item: DoctorScheduleItem };
+}
+
+export async function getDepartments() {
+  const res = await api.get('/api/appointments/departments');
+  return res.data as { departments: Department[] };
+}
+
+export async function getDoctorsByDepartment(departmentId: number) {
+  const res = await api.get(`/api/appointments/doctors/${departmentId}`);
+  return res.data as { doctors: Doctor[] };
+}
+
 export async function getDoctorSchedule() {
   const res = await api.get('/api/appointments/schedule');
   return res.data as { schedule: DoctorScheduleItem[] };
 }
 
-export async function updateAppointmentStatus(id: number, next: 'upcoming' | 'cancelled') {
-  const res = await api.patch(`/api/appointments/${id}/status`, { status: next });
-  return res.data as { ok: boolean; item: DoctorScheduleItem };
-}
+
 

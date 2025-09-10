@@ -32,6 +32,7 @@ export const typography = {
   subtitle: 12,
   body: 14,
   heading: 18,
+  caption: 12,   // <-- add this
 };
 
 export const shadow = {
