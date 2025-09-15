@@ -160,6 +160,18 @@ export default function HomeScreen() {
           </Text>
         </View>
 
+        {/* Doctor area */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Doctor tools</Text>
+          <Text style={styles.muted}>Review and manage your appointments</Text>
+          <TouchableOpacity
+            style={[styles.primaryBtn, { marginTop: spacing.md }]}
+            onPress={() => router.push('/(tabs)/DoctorScheduleScreen')}
+          >
+            <Text style={styles.primaryBtnText}>Open Doctor Schedule</Text>
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.header}>
           <Text style={styles.title}>Home</Text>
           <Text style={styles.subtitle}>Your calendar and appointments</Text>
