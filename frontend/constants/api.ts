@@ -25,6 +25,22 @@ export async function saveAccessToken(token: string) {
   setAccessToken(token);
 }
 
+// Persist and retrieve current user (for HomeScreen greeting and role-aware views) - Added to display users name on home Screen
+export async function saveCurrentUser(user: any) {
+  try {
+    await AsyncStorage.setItem('current_user', JSON.stringify(user || {}));
+  } catch {}
+}
+
+export async function loadCurrentUser(): Promise<any | null> {
+  try {
+    const raw = await AsyncStorage.getItem('current_user');
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function loadAccessToken() {
   try {
     const token = await AsyncStorage.getItem('access_token');
@@ -142,6 +158,19 @@ export async function getAppointmentDates(params: { start: string; end: string }
   return { appointments } as { appointments: Appointment[] };
 }
 
+export async function updateAppointmentStatus(
+  id: number,
+  next: 'upcoming' | 'cancelled',
+  options?: { cancellationReason?: string }
+) {
+  const body: any = { status: next };
+  if (next === 'cancelled' && options?.cancellationReason) {
+    body.cancellationReason = options.cancellationReason;
+  }
+  const res = await api.patch(`/api/appointments/${id}/status`, body);
+  return res.data as { ok: boolean; item: DoctorScheduleItem };
+}
+
 export type DoctorScheduleItem = {
   id: number;
   patient: { id: number; name: string };
@@ -151,11 +180,6 @@ export type DoctorScheduleItem = {
   status: string;
   reason?: string | null;
 };
-
-export async function updateAppointmentStatus(id: number, next: 'upcoming' | 'cancelled') {
-  const res = await api.patch(`/api/appointments/${id}/status`, { status: next });
-  return res.data as { ok: boolean; item: DoctorScheduleItem };
-}
 
 export async function getDepartments() {
   const res = await api.get('/api/appointments/departments');

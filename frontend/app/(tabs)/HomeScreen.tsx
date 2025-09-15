@@ -11,8 +11,9 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { palette, spacing, radii, shadow, typography } from '../../constants/theme';
-import { getAppointments } from '../../constants/api'; 
+import { getAppointments, getDoctorSchedule, DoctorScheduleItem, loadCurrentUser } from '../../constants/api'; 
 import { api } from '../../constants/api';
+
 
 // ---- date helpers
 const startOfDay = (d: Date) => {
@@ -50,8 +51,15 @@ const buildMonthGrid = (calendarMonth: Date) => {
 export default function HomeScreen() {
   const router = useRouter();
 
-  // TEMP user placeholder to avoid undefined references
-  const [me] = useState<any>(null);
+  // current user for greeting and role-aware data
+  const [me, setMe] = useState<any>(null);
+
+  useEffect(() => {
+    (async () => {
+      const u = await loadCurrentUser();
+      setMe(u);
+    })();
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -81,19 +89,23 @@ export default function HomeScreen() {
   );
   const daysGrid = useMemo(() => buildMonthGrid(calendarMonth), [calendarMonth]);
 
-  // fetch appointments for the visible month
+  // fetch data depending on role
   const fetchMonthAppointments = useCallback(async () => {
+    const isDoctor = me?.usertype === 'doctor';
     try {
       setError(null);
       setLoading(true);
-      const start = startOfMonth(calendarMonth).toISOString();
-      const end = endOfMonth(calendarMonth).toISOString();
-
-      // Adjust this call if your API is different:
-      const res = await getAppointments({ start, end });
-      // normalize defensively
-      const items = Array.isArray(res?.appointments) ? res.appointments : Array.isArray(res) ? res : [];
-      setMonthAppointments(items);
+      if (isDoctor) {
+        const res = await getDoctorSchedule();
+        const items = Array.isArray(res?.schedule) ? res.schedule : [];
+        setMonthAppointments(items);
+      } else {
+        const start = startOfMonth(calendarMonth).toISOString();
+        const end = endOfMonth(calendarMonth).toISOString();
+        const res = await getAppointments({ start, end });
+        const items = Array.isArray(res?.appointments) ? res.appointments : Array.isArray(res) ? res : [];
+        setMonthAppointments(items);
+      }
     } catch (e: any) {
       console.error('Failed to load appointments:', e);
       setError(e?.response?.data?.error || 'Failed to load appointments.');
@@ -101,7 +113,7 @@ export default function HomeScreen() {
     } finally {
       setLoading(false);
     }
-  }, [calendarMonth]);
+  }, [calendarMonth, me?.usertype]);
 
   useEffect(() => {
     fetchMonthAppointments();
@@ -136,7 +148,10 @@ export default function HomeScreen() {
     setCalendarMonth(startOfMonth(d));
     setSelectedDate(startOfMonth(d));
   };
+   
+  const isDoctor = (me?.usertype?.toLowerCase?.() === 'doctor');
 
+  
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
@@ -147,7 +162,7 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <View style={styles.logo}><Text style={styles.logoText}>+</Text></View>
           <Text style={styles.title}>MedData Hospital</Text>
-          <Text style={styles.subtitle}>Appointment Management {me?.usertype === 'doctor' ? '• Doctor' : ''}</Text>
+          <Text style={styles.subtitle}>Appointment Management</Text>
           <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
             <Text style={styles.logoutText}>Logout</Text>
           </TouchableOpacity>
@@ -155,12 +170,11 @@ export default function HomeScreen() {
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Welcome back</Text>
-          <Text style={styles.cardUser}>
-            {(me?.name || me?.fullName || 'User')}{me?.usertype === 'doctor' ? ' (Doctor)' : ''}
-          </Text>
+          <Text style={styles.cardUser}>{me?.name || me?.fullName || 'User'}</Text>
         </View>
 
-        {/* Doctor area */}
+      {/* Doctor area (visible only to doctors) */}
+      {isDoctor && (
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Doctor tools</Text>
           <Text style={styles.muted}>Review and manage your appointments</Text>
@@ -171,13 +185,15 @@ export default function HomeScreen() {
             <Text style={styles.primaryBtnText}>Open Doctor Schedule</Text>
           </TouchableOpacity>
         </View>
+      )}
+
 
         <View style={styles.header}>
           <Text style={styles.title}>Home</Text>
           <Text style={styles.subtitle}>Your calendar and appointments</Text>
         </View>
 
-        {/* Calendar */}
+        {/* Calendar (both roles) */}
         <View style={styles.card}>
           <View style={styles.calendarHeader}>
             <TouchableOpacity onPress={goPrevMonth} style={styles.monthBtn}>
@@ -246,12 +262,8 @@ export default function HomeScreen() {
         {/* Appointments list */}
         <View style={styles.card}>
           <View style={styles.listHeaderRow}>
-            <Text style={styles.sectionTitle}>
-              Appointments — {selectedDate.toLocaleDateString()}
-            </Text>
-            <TouchableOpacity onPress={onRefresh} style={styles.refreshBtn}>
-              <Text style={styles.refreshText}>Refresh</Text>
-            </TouchableOpacity>
+            <Text style={styles.sectionTitle}>Appointments — {selectedDate.toLocaleDateString()}</Text>
+            <TouchableOpacity onPress={onRefresh} style={styles.refreshBtn}><Text style={styles.refreshText}>Refresh</Text></TouchableOpacity>
           </View>
 
           {loading ? (
@@ -268,10 +280,11 @@ export default function HomeScreen() {
               {dayAppointments.map((a: any) => {
                 const d = new Date(a.startsAt);
                 const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-                const doctorName =
-                  a.doctor?.title && a.doctor?.name
-                    ? `${a.doctor.title} ${a.doctor.name}`
-                    : a.doctor?.name || a.doctorName || 'Doctor';
+                const isDoctor = me?.usertype === 'doctor';
+                const doctorName = a.doctor?.title && a.doctor?.name
+                  ? `${a.doctor.title} ${a.doctor.name}`
+                  : a.doctor?.name || a.doctorName || 'Doctor';
+                const patientName = a.patient?.name || 'Patient';
                 const departmentName = a.department?.name || a.departmentName || 'Department';
                 const status = (a.status || 'confirmed') as string;
 
@@ -281,7 +294,7 @@ export default function HomeScreen() {
                       <Text style={styles.apptTimeText}>{time}</Text>
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.apptTitle}>{doctorName}</Text>
+                      <Text style={styles.apptTitle}>{isDoctor ? patientName : doctorName}</Text>
                       <Text style={styles.apptSub}>{departmentName}</Text>
                     </View>
                     <View style={[styles.statusPill, statusStyles[status] || statusStyles.default]}>
