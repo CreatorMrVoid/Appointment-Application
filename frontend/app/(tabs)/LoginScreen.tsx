@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 
 import { router } from 'expo-router';
-import { loginUser, setAccessToken } from '../../constants/api';
+import { loginUser, saveAccessToken, saveCurrentUser } from '../../constants/api';
 
 type UserType = 'patient' | 'doctor';
 
@@ -35,7 +35,8 @@ export default function LoginScreen() {
     
     try {
       const { tokens, user } = await loginUser({ email, password });
-      setAccessToken(tokens?.accessToken);
+      await saveAccessToken(tokens?.accessToken);
+      await saveCurrentUser(user);
       setIsLoading(false);
       Alert.alert('Success', `Welcome ${user?.name || ''}!`);
       router.replace('/HomeScreen');
