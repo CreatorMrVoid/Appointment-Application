@@ -1,0 +1,108 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model appointments {
+  id                 Int                 @id @default(autoincrement())
+  doctorId           Int
+  patientId          Int
+  departmentId       Int?
+  startsAt           DateTime            @db.DateTime(0)
+  endsAt             DateTime            @db.DateTime(0)
+  status             appointments_status @default(PENDING)
+  reason             String?             @db.VarChar(200)
+  notes              String?             @db.Text
+  source             String?             @db.VarChar(30)
+  cancelledAt        DateTime?           @db.DateTime(0)
+  cancellationReason String?             @db.VarChar(200)
+  createdAt          DateTime            @default(now()) @db.Timestamp(0)
+  updatedAt          DateTime            @db.Timestamp(0)
+
+  @@unique([doctorId, startsAt])
+  @@index([departmentId], map: "appointments_departmentId_fkey")
+  @@index([doctorId, startsAt])
+  @@index([patientId, startsAt])
+  @@index([status])
+}
+
+model departments {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique @db.VarChar(100)
+  code        String?  @unique @db.VarChar(20)
+  description String?  @db.VarChar(255)
+  phone       String?  @db.VarChar(20)
+  location    String?  @db.VarChar(100)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now()) @db.Timestamp(0)
+  updatedAt   DateTime @db.Timestamp(0)
+}
+
+model doctors {
+  id           Int      @id @default(autoincrement())
+  userId       Int      @unique
+  departmentId Int?
+  title        String?  @db.VarChar(50)
+  bio          String?  @db.Text
+  room         String?  @db.VarChar(20)
+  room_phone   String?  @db.VarChar(20)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now()) @db.Timestamp(0)
+  updatedAt    DateTime @db.Timestamp(0)
+
+  @@index([departmentId])
+}
+
+model users {
+  id         Int       @id @default(autoincrement())
+  name       String    @unique(map: "username") @db.VarChar(50)
+  email      String    @unique(map: "email") @db.VarChar(100)
+  password   String    @db.VarChar(255)
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  usertype   String    @db.VarChar(10)
+  phone      String?   @db.VarChar(20)
+  ssn        String?   @db.VarChar(11)
+  
+  healthUser   healthUser?
+  @@map("users")
+}
+
+enum bloodType {
+  A_POS
+  A_NEG
+  B_POS
+  B_NEG
+  AB_POS
+  AB_NEG
+  O_POS
+  O_NEG
+}
+
+model healthUser {
+  // use userId as the primary key to enforce strict 1-1 with users
+  userId     Int       @id
+  user       users     @relation(fields: [userId], references: [id])
+
+  age        Int?      // years
+  bloodType  bloodType?
+  height     Float?    // centimeters
+  weight     Float?    // kilograms
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@map("healthUser")  // exact table name
+}
+
+enum appointments_status {
+  PENDING
+  CONFIRMED
+  RESCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
