@@ -232,6 +232,13 @@ export default function HomeScreen() {
           <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
             <Text style={styles.logoutText}>Logout</Text>
           </TouchableOpacity>
+          {/* Health Info button */}
+          <TouchableOpacity
+            style={[styles.primaryBtn, { marginTop: spacing.md }]}
+            onPress={() => router.push('/(tabs)/HealthInfoScreen')}
+          >
+            <Text style={styles.primaryBtnText}>Health Information</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.card}>

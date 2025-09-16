@@ -196,5 +196,23 @@ export async function getDoctorSchedule() {
   return res.data as { schedule: DoctorScheduleItem[] };
 }
 
+export type HealthInfo = {
+  userId: number;
+  age?: number | null;
+  bloodType?: 'A_POS'|'A_NEG'|'B_POS'|'B_NEG'|'AB_POS'|'AB_NEG'|'O_POS'|'O_NEG' | null;
+  height?: number | null; // cm
+  weight?: number | null; // kg
+  createdAt?: string;
+  updatedAt?: string;
+};
 
+export async function getMyHealthInfo(): Promise<{ health: HealthInfo | null }> {
+  const { data } = await api.get('/api/health/me');
+  return data;
+}
+
+export async function upsertMyHealthInfo(body: Partial<HealthInfo>): Promise<{ health: HealthInfo }> {
+  const { data } = await api.put('/api/health/me', body);
+  return data;
+}
 
