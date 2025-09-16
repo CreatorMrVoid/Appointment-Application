@@ -8,12 +8,18 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { palette, spacing, radii, shadow, typography } from '../../constants/theme';
-import { getAppointments, getDoctorSchedule, DoctorScheduleItem, loadCurrentUser } from '../../constants/api'; 
+import {
+  getAppointments,
+  getDoctorSchedule,
+  DoctorScheduleItem,
+  loadCurrentUser,
+  updateAppointmentStatus, // <-- ADDED: reuse same API for patient cancel
+} from '../../constants/api';
 import { api } from '../../constants/api';
-
 
 // ---- date helpers
 const startOfDay = (d: Date) => {
@@ -63,14 +69,11 @@ export default function HomeScreen() {
 
   const handleLogout = async () => {
     try {
-      await api.post('/api/auth/logout'); // backend does not has this!
-    } catch (e) {
-      // ignore
-    } finally {
-      router.replace('/(tabs)/LoginScreen'); // navigate to login page
-    }
+      await api.post('/api/auth/logout'); // backend may not have this; ignore errors
+    } catch {}
+    router.replace('/(tabs)/LoginScreen');
   };
-  
+
   // calendar state
   const today = useMemo(() => startOfDay(new Date()), []);
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => startOfMonth(new Date()));
@@ -82,6 +85,11 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // NEW: cancelling UX state
+  const [cancellingId, setCancellingId] = useState<string | number | null>(null);
+  // FAB state
+  const [fabOpen, setFabOpen] = useState(false);
+
   // derived
   const monthLabel = useMemo(
     () => calendarMonth.toLocaleString(undefined, { month: 'long', year: 'numeric' }),
@@ -91,7 +99,7 @@ export default function HomeScreen() {
 
   // fetch data depending on role
   const fetchMonthAppointments = useCallback(async () => {
-    const isDoctor = me?.usertype === 'doctor';
+    const isDoctor = me?.usertype?.toLowerCase?.() === 'doctor';
     try {
       setError(null);
       setLoading(true);
@@ -103,7 +111,9 @@ export default function HomeScreen() {
         const start = startOfMonth(calendarMonth).toISOString();
         const end = endOfMonth(calendarMonth).toISOString();
         const res = await getAppointments({ start, end });
-        const items = Array.isArray(res?.appointments) ? res.appointments : Array.isArray(res) ? res : [];
+        const items = Array.isArray(res?.appointments)
+          ? res.appointments
+          : Array.isArray(res) ? res : [];
         setMonthAppointments(items);
       }
     } catch (e: any) {
@@ -129,17 +139,18 @@ export default function HomeScreen() {
   const dayAppointments = useMemo(() => {
     const start = startOfDay(selectedDate);
     const end = endOfDay(selectedDate);
-    return monthAppointments.filter((a: any) => {
-      const d = new Date(a.startsAt);
-      return d >= start && d <= end;
-    }).sort((a: any, b: any) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+    return monthAppointments
+      .filter((a: any) => {
+        const d = new Date(a.startsAt);
+        return d >= start && d <= end;
+      })
+      .sort((a: any, b: any) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
   }, [monthAppointments, selectedDate]);
 
   const goPrevMonth = () => {
     const d = new Date(calendarMonth);
     d.setMonth(d.getMonth() - 1);
     setCalendarMonth(startOfMonth(d));
-    // ensure selected date stays within (or move to 1st)
     setSelectedDate(startOfMonth(d));
   };
   const goNextMonth = () => {
@@ -148,10 +159,65 @@ export default function HomeScreen() {
     setCalendarMonth(startOfMonth(d));
     setSelectedDate(startOfMonth(d));
   };
-   
-  const isDoctor = (me?.usertype?.toLowerCase?.() === 'doctor');
 
-  
+  const isDoctor = me?.usertype?.toLowerCase?.() === 'doctor';
+  const isPatient = !isDoctor;
+
+  // ---- Patient cancel handlers
+  const canPatientCancel = (appt: any) => {
+    const now = new Date();
+    const when = new Date(appt.startsAt);
+    const status = String(appt.status || 'confirmed').toLowerCase();
+    const isFuture = when.getTime() >= now.getTime();
+    const notFinal = status !== 'cancelled' && status !== 'completed';
+    return isPatient && isFuture && notFinal;
+  };
+
+  const askCancel = (appt: any) => {
+    Alert.alert(
+      'Are you sure?',
+      'Do you want to cancel this appointment?',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes, cancel',
+          style: 'destructive',
+          onPress: () => patientCancel(appt),
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const patientCancel = async (appt: any) => {
+    if (!canPatientCancel(appt)) return;
+
+    try {
+      setCancellingId(appt.id);
+
+      // optimistic update
+      setMonthAppointments(prev =>
+        prev.map(x => (String(x.id) === String(appt.id) ? { ...x, status: 'cancelled' } : x))
+      );
+
+      // call API (reuse same endpoint as doctors)
+      await updateAppointmentStatus(appt.id, 'cancelled');
+
+      // optionally refresh from server for strong consistency:
+      // await fetchMonthAppointments();
+
+      Alert.alert('Cancelled', 'Your appointment has been cancelled.');
+    } catch (e: any) {
+      // revert on failure
+      setMonthAppointments(prev =>
+        prev.map(x => (String(x.id) === String(appt.id) ? { ...x, status: appt.status } : x))
+      );
+      Alert.alert('Cancel failed', e?.response?.data?.error ?? e?.message ?? 'Please try again.');
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
@@ -166,6 +232,13 @@ export default function HomeScreen() {
           <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
             <Text style={styles.logoutText}>Logout</Text>
           </TouchableOpacity>
+          {/* Health Info button */}
+          <TouchableOpacity
+            style={[styles.primaryBtn, { marginTop: spacing.md }]}
+            onPress={() => router.push('/(tabs)/HealthInfoScreen')}
+          >
+            <Text style={styles.primaryBtnText}>Health Information</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.card}>
@@ -173,20 +246,19 @@ export default function HomeScreen() {
           <Text style={styles.cardUser}>{me?.name || me?.fullName || 'User'}</Text>
         </View>
 
-      {/* Doctor area (visible only to doctors) */}
-      {isDoctor && (
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Doctor tools</Text>
-          <Text style={styles.muted}>Review and manage your appointments</Text>
-          <TouchableOpacity
-            style={[styles.primaryBtn, { marginTop: spacing.md }]}
-            onPress={() => router.push('/(tabs)/DoctorScheduleScreen')}
-          >
-            <Text style={styles.primaryBtnText}>Open Doctor Schedule</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
+        {/* Doctor area (visible only to doctors) */}
+        {isDoctor && (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Doctor tools</Text>
+            <Text style={styles.muted}>Review and manage your appointments</Text>
+            <TouchableOpacity
+              style={[styles.primaryBtn, { marginTop: spacing.md }]}
+              onPress={() => router.push('/(tabs)/DoctorScheduleScreen')}
+            >
+              <Text style={styles.primaryBtnText}>Open Doctor Schedule</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         <View style={styles.header}>
           <Text style={styles.title}>Home</Text>
@@ -220,7 +292,7 @@ export default function HomeScreen() {
               const disabled = startOfDay(cellDate) < today;
               const selected = isSameDay(cellDate, selectedDate);
 
-               //badge: how many appts that day? İt looks bad so I removed it.
+              // Count badge (kept)
               const count = monthAppointments.reduce((acc: number, a: any) => {
                 const ad = new Date(a.startsAt);
                 return isSameDay(ad, cellDate) ? acc + 1 : acc;
@@ -258,12 +330,22 @@ export default function HomeScreen() {
             })}
           </View>
         </View>
+            
+        {/* CTA */}
+        <TouchableOpacity
+          style={styles.primaryBtn}
+          onPress={() => router.push('/(tabs)/NewAppointmentScreen')}
+        >
+          <Text style={styles.primaryBtnText}>New Appointment</Text>
+        </TouchableOpacity>
 
         {/* Appointments list */}
         <View style={styles.card}>
           <View style={styles.listHeaderRow}>
             <Text style={styles.sectionTitle}>Appointments — {selectedDate.toLocaleDateString()}</Text>
-            <TouchableOpacity onPress={onRefresh} style={styles.refreshBtn}><Text style={styles.refreshText}>Refresh</Text></TouchableOpacity>
+            <TouchableOpacity onPress={onRefresh} style={styles.refreshBtn}>
+              <Text style={styles.refreshText}>Refresh</Text>
+            </TouchableOpacity>
           </View>
 
           {loading ? (
@@ -280,7 +362,7 @@ export default function HomeScreen() {
               {dayAppointments.map((a: any) => {
                 const d = new Date(a.startsAt);
                 const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-                const isDoctor = me?.usertype === 'doctor';
+                const isDoctorRole = isDoctor;
                 const doctorName = a.doctor?.title && a.doctor?.name
                   ? `${a.doctor.title} ${a.doctor.name}`
                   : a.doctor?.name || a.doctorName || 'Doctor';
@@ -288,18 +370,34 @@ export default function HomeScreen() {
                 const departmentName = a.department?.name || a.departmentName || 'Department';
                 const status = (a.status || 'confirmed') as string;
 
+                const showCancel = canPatientCancel(a);
+                const cancelling = cancellingId === a.id;
+
                 return (
                   <View key={a.id} style={styles.apptItem}>
                     <View style={styles.apptTimePill}>
                       <Text style={styles.apptTimeText}>{time}</Text>
                     </View>
+
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.apptTitle}>{isDoctor ? patientName : doctorName}</Text>
+                      <Text style={styles.apptTitle}>{isDoctorRole ? patientName : doctorName}</Text>
                       <Text style={styles.apptSub}>{departmentName}</Text>
                     </View>
+
                     <View style={[styles.statusPill, statusStyles[status] || statusStyles.default]}>
                       <Text style={styles.statusText}>{status}</Text>
                     </View>
+
+                    {/* Patient-only Cancel */}
+                    {showCancel && (
+                      <TouchableOpacity
+                        style={[styles.cancelBtn, cancelling && styles.cancelBtnDisabled]}
+                        onPress={() => askCancel(a)}
+                        disabled={cancelling}
+                      >
+                        <Text style={styles.cancelBtnText}>{cancelling ? 'Cancelling…' : 'Cancel'}</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 );
               })}
@@ -307,14 +405,27 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {/* CTA */}
-        <TouchableOpacity
-          style={styles.primaryBtn}
-          onPress={() => router.push('/(tabs)/NewAppointmentScreen')}
-        >
-          <Text style={styles.primaryBtnText}>New Appointment</Text>
-        </TouchableOpacity>
       </ScrollView>
+
+      {/* Floating Action Button (bottom-left) */}
+      <View pointerEvents="box-none" style={styles.fabWrap}>
+        {/* Expanded actions */}
+        {fabOpen && (
+          <View style={styles.fabActions}>
+            <TouchableOpacity style={styles.fabActionBtn} onPress={() => router.push('/(tabs)/MapScreen')}>
+              <Text style={styles.fabActionText}>Map</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.fabActionBtn} onPress={() => router.push({ pathname: '/(tabs)/InfoScreen' as any })}>
+              <Text style={styles.fabActionText}>Info</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Main FAB */}
+        <TouchableOpacity style={styles.fabMain} onPress={() => setFabOpen(o => !o)}>
+          <Text style={styles.fabMainText}>{fabOpen ? '×' : '+'}</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
@@ -388,34 +499,32 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     backgroundColor: palette.neutral,
     position: 'relative',
-    paddingTop: 2, //adjutable
-
+    paddingTop: 2,
   },
   daySelected: { backgroundColor: palette.primary },
   dayDisabled: { opacity: 0.4 },
   dayText: { color: palette.text, fontWeight: '700' },
   dayTextSelected: { color: palette.white },
   dayTextDisabled: { color: palette.mutedText },
-  // Replace these styles in your StyleSheet:
 
   badge: {
     position: 'absolute',
-    top: 1,            // moved from bottom to top
+    top: 1,
     right: 1,
     minWidth: 18,
     height: 18,
     paddingHorizontal: 4,
     borderRadius: 9,
-    backgroundColor: palette.surface,   // non-selected bg
+    backgroundColor: palette.surface,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 1,         // ensure it stays above the day number
+    zIndex: 1,
   },
   badgeSelected: {
-    backgroundColor: palette.white,     // when the cell is selected
+    backgroundColor: palette.white,
   },
   badgeText: {
-    fontSize: 10,       // smaller so it won’t collide visually
+    fontSize: 10,
     fontWeight: '700',
     color: palette.text,
   },
@@ -455,6 +564,17 @@ const styles = StyleSheet.create({
   },
   statusText: { color: palette.text, fontWeight: '700', textTransform: 'capitalize' },
 
+  // Patient cancel button
+  cancelBtn: {
+    marginLeft: spacing.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: '#d9534f',
+  },
+  cancelBtnDisabled: { opacity: 0.6 },
+  cancelBtnText: { color: palette.white, fontWeight: '700' },
+
   // CTA
   primaryBtn: {
     backgroundColor: palette.primary,
@@ -469,6 +589,35 @@ const styles = StyleSheet.create({
   loadingText: { marginLeft: spacing.sm, color: palette.mutedText, fontSize: typography.body },
   errorText: { color: 'crimson' },
   muted: { color: palette.mutedText },
+
+  // Floating action button
+  fabWrap: {
+    position: 'absolute',
+    left: spacing.lg,
+    bottom: spacing.lg,
+  },
+  fabMain: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: palette.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadow.card,
+  },
+  fabMainText: { color: palette.white, fontWeight: '700', fontSize: 28, lineHeight: 28 },
+  fabActions: {
+    marginBottom: spacing.sm,
+    gap: 8,
+  },
+  fabActionBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    borderRadius: radii.md,
+    backgroundColor: palette.card,
+    ...shadow.card,
+  },
+  fabActionText: { color: palette.text, fontWeight: '700' },
 });
 
 // simple color mapping for statuses (tweak to your palette)

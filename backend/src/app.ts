@@ -7,8 +7,10 @@ import morgan from "morgan";
 import env from "./utils/env";
 import authRouter from "./routes/auth_routes";
 import appointmentRouter from "./routes/appointment_routes";
+import healthRouter from "./routes/health_routes";
 import rateLimit from "express-rate-limit";
 import { errorHandler } from "./middlewares/error";
+import healthRoutes from "./routes/health_routes";
 
 const app = express();
 app.use(helmet());
@@ -24,6 +26,10 @@ app.use("/api/auth", authLimiter);
 
 app.use("/api/auth", authRouter);
 app.use("/api/appointments", appointmentRouter);
+app.use("/api", healthRouter);
+
+// health display
+app.use('/api', healthRoutes);
 
 // central error handler (must be last)
 app.use(errorHandler);
